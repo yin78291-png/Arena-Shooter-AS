@@ -96,9 +96,9 @@
       </div>
       <div class="panel" style="text-align:left"><strong>ALL-TIME LEADERBOARD</strong><ol id="menuLeaderboard"></ol></div>
       <p class="small">WASD move · Mouse aim · Click fire · Space jump · Shift sprint<br>1–6 or mouse wheel switch weapons · L gun shop · T chat</p>
-      <p class="small">Five extra guns cost 200 points each; earn 100 points per enemy · E heals at the green station</p>
+      <p class="small">Five extra guns cost 200 points each; earn 50 points per enemy · E heals at the green station</p>
       <p class="small">Your name, unlocked guns, points, and leaderboard are saved in this browser.</p>
-      <p class="small">A fresh room code is generated each time this page loads. Share your code with friends, or enter their code to join their room. Multiplayer works between tabs/windows of this browser; internet matchmaking needs a game server.</p>
+      <p class="small">For same-Wi-Fi multiplayer, run start-server.bat on the host laptop. Open the LAN address it prints on every laptop, then enter the same room code. Keep the server window open. The standalone file only connects browser tabs on one device.</p>
     </div>
   </div>
   <div id="hud">
@@ -164,52 +164,117 @@
     }
     const starGeometry = new THREE.BufferGeometry();
     starGeometry.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
-    scene.add(new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xe7f0ff, size: 1.2, sizeAttenuation: false, transparent: true, opacity: .9, fog: false })));
+    const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xe7f0ff, size: 1.2, sizeAttenuation: false, transparent: true, opacity: .9, fog: false }));
+    scene.add(stars);
 
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x3b4653, roughness: .93 }));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.MeshStandardMaterial({ color: 0x3b4653, roughness: .93 }));
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
-    const grid = new THREE.GridHelper(200, 100, 0x566879, 0x3c4b5c);
+    const grid = new THREE.GridHelper(300, 150, 0x566879, 0x3c4b5c);
     grid.position.y = .015;
     scene.add(grid);
 
     const obstacles = [];
-    function box(x, y, z, sx, sy, sz, color, solid = true) {
+    const worldChunks = new Map();
+    const worldChunkSize = 100;
+    let loadedChunkCenterX = null;
+    let loadedChunkCenterZ = null;
+    function box(x, y, z, sx, sy, sz, color, solid = true, parent = scene) {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), new THREE.MeshStandardMaterial({ color, roughness: .76 }));
       mesh.position.set(x, y, z);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      scene.add(mesh);
-      if (solid) obstacles.push({ x, z, hx: sx / 2, hz: sz / 2, h: sy });
+      parent.add(mesh);
+      if (solid) obstacles.push({ x, z, hx: sx / 2, hz: sz / 2, h: sy, owner: parent });
       return mesh;
     }
-    box(0, 2, -50, 100, 4, 1, 0x3c4b5b);
-    box(0, 2, 50, 100, 4, 1, 0x3c4b5b);
-    box(-50, 2, 0, 1, 4, 100, 0x3c4b5b);
-    box(50, 2, 0, 1, 4, 100, 0x3c4b5b);
-    function buildBuilding(x, z, width, depth, color) {
+    function buildBuilding(x, z, width, depth, color, parent = scene) {
       const height = 10;
       const wall = .7;
       const door = 3.2;
       const sideLength = (width - door) / 2;
-      box(x, .12, z, width - wall, .24, depth - wall, 0x737f79, false);
-      box(x - width / 2 + wall / 2, height / 2, z, wall, height, depth, color);
-      box(x + width / 2 - wall / 2, height / 2, z, wall, height, depth, color);
-      box(x, height / 2, z - depth / 2 + wall / 2, width, height, wall, color);
-      box(x - (door + sideLength) / 2, height / 2, z + depth / 2 - wall / 2, sideLength, height, wall, color);
-      box(x + (door + sideLength) / 2, height / 2, z + depth / 2 - wall / 2, sideLength, height, wall, color);
-      box(x, height - wall / 2, z, width, wall, depth, color, false);
-      box(x, height - .35, z + depth / 2 - wall / 2, door, .7, wall, color, false);
-      box(x - 2.7, 5.3, z + depth / 2 - wall / 2 - .03, 1.8, 2.2, .08, 0x263c51, false);
-      box(x + 2.7, 5.3, z + depth / 2 - wall / 2 - .03, 1.8, 2.2, .08, 0x263c51, false);
-      box(x - 2.7, 8, z + depth / 2 - wall / 2 - .03, 1.8, 1.2, .08, 0x263c51, false);
-      box(x + 2.7, 8, z + depth / 2 - wall / 2 - .03, 1.8, 1.2, .08, 0x263c51, false);
+      box(x, .12, z, width - wall, .24, depth - wall, 0x737f79, false, parent);
+      box(x - width / 2 + wall / 2, height / 2, z, wall, height, depth, color, true, parent);
+      box(x + width / 2 - wall / 2, height / 2, z, wall, height, depth, color, true, parent);
+      box(x, height / 2, z - depth / 2 + wall / 2, width, height, wall, color, true, parent);
+      box(x - (door + sideLength) / 2, height / 2, z + depth / 2 - wall / 2, sideLength, height, wall, color, true, parent);
+      box(x + (door + sideLength) / 2, height / 2, z + depth / 2 - wall / 2, sideLength, height, wall, color, true, parent);
+      box(x, height - wall / 2, z, width, wall, depth, color, false, parent);
+      box(x, height - .35, z + depth / 2 - wall / 2, door, .7, wall, color, false, parent);
+      box(x - 2.7, 5.3, z + depth / 2 - wall / 2 - .03, 1.8, 2.2, .08, 0x263c51, false, parent);
+      box(x + 2.7, 5.3, z + depth / 2 - wall / 2 - .03, 1.8, 2.2, .08, 0x263c51, false, parent);
+      box(x - 2.7, 8, z + depth / 2 - wall / 2 - .03, 1.8, 1.2, .08, 0x263c51, false, parent);
+      box(x + 2.7, 8, z + depth / 2 - wall / 2 - .03, 1.8, 1.2, .08, 0x263c51, false, parent);
     }
     buildBuilding(-10, -8, 10, 9, 0x52636c);
     buildBuilding(9, 7, 10, 9, 0x59666e);
     box(4, .8, -15, 3, 1.6, 7, 0x52636c);
     buildBuilding(-16, 13, 8, 8, 0x58696c);
+
+    function randomForChunk(x, z) {
+      let seed = Math.imul(x, 374761393) + Math.imul(z, 668265263);
+      seed = Math.imul(seed ^ (seed >>> 13), 1274126177);
+      return function() {
+        seed = (seed + 0x6d2b79f5) | 0;
+        let value = seed;
+        value = Math.imul(value ^ (value >>> 15), value | 1);
+        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+        return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function addWorldChunk(chunkX, chunkZ) {
+      const key = `${chunkX},${chunkZ}`;
+      if (worldChunks.has(key)) return;
+      const centerX = chunkX * worldChunkSize;
+      const centerZ = chunkZ * worldChunkSize;
+      if (Math.abs(centerX) < 140 && Math.abs(centerZ) < 140) {
+        worldChunks.set(key, null);
+        return;
+      }
+      const random = randomForChunk(chunkX, chunkZ);
+      const group = new THREE.Group();
+      group.userData.chunkKey = key;
+      scene.add(group);
+      const count = 2 + Math.floor(random() * 3);
+      for (let i = 0; i < count; i++) {
+        const width = 8 + random() * 8;
+        const depth = 8 + random() * 8;
+        const x = centerX + (random() - .5) * (worldChunkSize - width - 12);
+        const z = centerZ + (random() - .5) * (worldChunkSize - depth - 12);
+        const nearPlayer = Math.hypot(x - player.pos.x, z - player.pos.z) < Math.max(width, depth) + 8;
+        const overlaps = obstacles.some(o => Math.abs(x - o.x) < width / 2 + o.hx + 3 && Math.abs(z - o.z) < depth / 2 + o.hz + 3);
+        if (!nearPlayer && !overlaps) buildBuilding(x, z, width, depth, random() < .5 ? 0x465b68 : 0x505c67, group);
+      }
+      worldChunks.set(key, group);
+    }
+    function updateWorldChunks() {
+      const centerX = Math.floor(player.pos.x / worldChunkSize);
+      const centerZ = Math.floor(player.pos.z / worldChunkSize);
+      if (centerX === loadedChunkCenterX && centerZ === loadedChunkCenterZ) return;
+      loadedChunkCenterX = centerX;
+      loadedChunkCenterZ = centerZ;
+      for (let x = centerX - 2; x <= centerX + 2; x++) {
+        for (let z = centerZ - 2; z <= centerZ + 2; z++) addWorldChunk(x, z);
+      }
+      for (const [key, group] of worldChunks) {
+        const [x, z] = key.split(",").map(Number);
+        if (Math.abs(x - centerX) <= 2 && Math.abs(z - centerZ) <= 2) continue;
+        if (group) {
+          scene.remove(group);
+          group.traverse(object => {
+            if (object.isMesh) {
+              object.geometry.dispose();
+              object.material.dispose();
+            }
+          });
+          for (let i = obstacles.length - 1; i >= 0; i--) {
+            if (obstacles[i].owner === group) obstacles.splice(i, 1);
+          }
+        }
+        worldChunks.delete(key);
+      }
+    }
 
     const station = new THREE.Group();
     station.position.set(0, 0, 0);
@@ -254,6 +319,9 @@
     let lastShot = 0;
     let lastState = 0;
     let channel = null;
+    let socket = null;
+    let networkMode = location.protocol === "http:" || location.protocol === "https:";
+    let networkStatus = networkMode ? "Connecting" : "Same-device only";
     let noticeTimeout = 0;
     let firing = false;
     let shopOpen = false;
@@ -334,59 +402,119 @@
       document.getElementById("weaponName").textContent = weapons[player.weapon].name;
       document.getElementById("ammoText").textContent = player.unlocked.includes(player.weapon) ? `∞ · ${player.weapon + 1} / 6 · ${player.points} pts` : `LOCKED · 200 pts · ${player.points} pts`;
       document.getElementById("scoreText").textContent = `Points ${player.points} · KOs ${player.kills}`;
-      document.getElementById("roster").textContent = remotes.size ? `${remotes.size + 1} in room` : "Solo arena";
+      document.getElementById("roster").textContent = networkMode
+        ? `${networkStatus} · ${remotes.size + 1} player${remotes.size === 0 ? "" : "s"}`
+        : (remotes.size ? `${remotes.size + 1} in room` : "Same-device only");
       document.getElementById("roomCodeLabel").textContent = `ROOM CODE: ${currentRoomCode}`;
     }
     function announce(type, extra = {}) {
-      if (channel) channel.postMessage({ type, id: playerId, ...extra });
+      const message = { type, id: playerId, ...extra };
+      if (channel) channel.postMessage(message);
+      if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+    }
+    function handleRoomMessage(data) {
+      if (!data || data.id === playerId) return;
+      if (data.type === "joined") {
+        networkStatus = "Connected";
+        updateHud();
+        announce("state", { x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.yaw, health: player.health, name: player.name });
+        return;
+      }
+      if (data.type === "hello") {
+        announce("state", { x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.yaw, health: player.health, name: player.name });
+        return;
+      }
+      if (data.type === "error") {
+        networkStatus = "Room error";
+        showNotice(data.message || "Could not join room.");
+        updateHud();
+        return;
+      }
+      if (data.type === "state") {
+        if (typeof data.id !== "string" || !Number.isFinite(data.x) || !Number.isFinite(data.y) || !Number.isFinite(data.z)) return;
+        let remote = remotes.get(data.id);
+        if (!remote) {
+          const group = new THREE.Group();
+          const body = new THREE.Mesh(new THREE.CapsuleGeometry(.45, .85, 4, 8), new THREE.MeshStandardMaterial({ color: 0x58a6ff, emissive: 0x102f59 }));
+          body.position.y = .9;
+          const head = new THREE.Mesh(new THREE.SphereGeometry(.29, 12, 10), new THREE.MeshStandardMaterial({ color: 0xaed8ff }));
+          head.position.y = 1.72;
+          group.add(body, head);
+          scene.add(group);
+          remote = { group, health: 100, lastSeen: performance.now() };
+          remotes.set(data.id, remote);
+        }
+        remote.group.position.set(data.x, 0, data.z);
+        remote.group.rotation.y = data.yaw;
+        remote.health = data.health;
+        remote.lastSeen = performance.now();
+        if (data.name) remote.name = data.name;
+      } else if (data.type === "shot") {
+        if (![data.x, data.y, data.z, data.dx, data.dy, data.dz].every(Number.isFinite)) return;
+        drawShot(new THREE.Vector3(data.x, data.y, data.z), new THREE.Vector3(data.dx, data.dy, data.dz), data.color);
+        const origin = new THREE.Vector3(data.x, data.y, data.z);
+        const direction = new THREE.Vector3(data.dx, data.dy, data.dz).normalize();
+        const toPlayer = player.pos.clone().add(new THREE.Vector3(0, -.55, 0)).sub(origin);
+        const along = toPlayer.dot(direction);
+        const closest = origin.clone().addScaledVector(direction, along);
+        if (along > 0 && along < 100 && closest.distanceTo(player.pos.clone().add(new THREE.Vector3(0, -.55, 0))) < .75) {
+          if (!developerMode) {
+            player.health = Math.max(0, player.health - (data.damage || 10));
+            if (!player.health) respawn();
+          }
+          updateHud();
+        }
+      } else if (data.type === "bye") {
+        const remote = remotes.get(data.id);
+        if (remote) scene.remove(remote.group);
+        remotes.delete(data.id);
+      } else if (data.type === "chat" && typeof data.message === "string" && typeof data.name === "string") {
+        appendChatMessage(data.name.slice(0, 20), data.message.slice(0, 160));
+      }
+      updateHud();
     }
     function openRoom(room) {
       if (channel) channel.close();
-      if ("BroadcastChannel" in window) {
-        channel = new BroadcastChannel(`neon-outpost:${room.toLowerCase()}`);
-        channel.onmessage = ({ data }) => {
-          if (!data || data.id === playerId) return;
-          if (data.type === "state") {
-            let remote = remotes.get(data.id);
-            if (!remote) {
-              const group = new THREE.Group();
-              const body = new THREE.Mesh(new THREE.CapsuleGeometry(.45, .85, 4, 8), new THREE.MeshStandardMaterial({ color: 0x58a6ff, emissive: 0x102f59 }));
-              body.position.y = .9;
-              const head = new THREE.Mesh(new THREE.SphereGeometry(.29, 12, 10), new THREE.MeshStandardMaterial({ color: 0xaed8ff }));
-              head.position.y = 1.72;
-              group.add(body, head);
-              scene.add(group);
-              remote = { group, health: 100, lastSeen: performance.now() };
-              remotes.set(data.id, remote);
-            }
-            remote.group.position.set(data.x, 0, data.z);
-            remote.group.rotation.y = data.yaw;
-            remote.health = data.health;
-            remote.lastSeen = performance.now();
-            if (data.name) remote.name = data.name;
-          } else if (data.type === "shot") {
-            drawShot(new THREE.Vector3(data.x, data.y, data.z), new THREE.Vector3(data.dx, data.dy, data.dz), data.color);
-            const origin = new THREE.Vector3(data.x, data.y, data.z);
-            const direction = new THREE.Vector3(data.dx, data.dy, data.dz).normalize();
-            const toPlayer = player.pos.clone().add(new THREE.Vector3(0, -.55, 0)).sub(origin);
-            const along = toPlayer.dot(direction);
-            const closest = origin.clone().addScaledVector(direction, along);
-            if (along > 0 && along < 100 && closest.distanceTo(player.pos.clone().add(new THREE.Vector3(0, -.55, 0))) < .75) {
-              if (!developerMode) {
-                player.health = Math.max(0, player.health - (data.damage || 10));
-                if (!player.health) respawn();
-              }
-              updateHud();
-            }
-          } else if (data.type === "bye") {
-            const remote = remotes.get(data.id);
-            if (remote) scene.remove(remote.group);
-            remotes.delete(data.id);
-          } else if (data.type === "chat" && typeof data.message === "string" && typeof data.name === "string") {
-            appendChatMessage(data.name.slice(0, 20), data.message.slice(0, 160));
+      if (socket) {
+        socket.close();
+        socket = null;
+      }
+      for (const remote of remotes.values()) scene.remove(remote.group);
+      remotes.clear();
+      if (networkMode) {
+        const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+        const newSocket = new WebSocket(`${protocol}//${location.host}/multiplayer`);
+        socket = newSocket;
+        networkStatus = "Connecting";
+        updateHud();
+        newSocket.addEventListener("open", () => {
+          if (socket !== newSocket) return;
+          newSocket.send(JSON.stringify({ type: "join", id: playerId, room }));
+        });
+        newSocket.addEventListener("message", event => {
+          if (socket !== newSocket) return;
+          try {
+            handleRoomMessage(JSON.parse(event.data));
+          } catch (error) {
+            console.error("Could not read multiplayer message.", error);
           }
+        });
+        newSocket.addEventListener("error", () => {
+          if (socket !== newSocket) return;
+          networkStatus = "Server unavailable";
+          showNotice("Could not reach the Wi-Fi game server.");
           updateHud();
-        };
+        });
+        newSocket.addEventListener("close", () => {
+          if (socket !== newSocket) return;
+          networkStatus = "Disconnected";
+          for (const remote of remotes.values()) scene.remove(remote.group);
+          remotes.clear();
+          updateHud();
+        });
+      } else if ("BroadcastChannel" in window) {
+        channel = new BroadcastChannel(`neon-outpost:${room.toLowerCase()}`);
+        channel.onmessage = ({ data }) => handleRoomMessage(data);
         announce("hello");
       } else {
         showNotice("Multiplayer is unavailable in this browser.");
@@ -395,7 +523,7 @@
     function sendState(now) {
       if (now - lastState < 100) return;
       lastState = now;
-      announce("state", { x: player.pos.x, z: player.pos.z, yaw: player.yaw, health: player.health });
+      announce("state", { x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.yaw, health: player.health, name: player.name });
       for (const [id, remote] of remotes) {
         if (now - remote.lastSeen > 5000) {
           scene.remove(remote.group);
@@ -432,7 +560,7 @@
           bot.alive = false;
           bot.group.visible = false;
           player.kills++;
-          player.points += 100;
+          player.points += 50;
           savePlayer();
           recordBest();
           updateHud();
@@ -455,7 +583,8 @@
     }
     function respawn() {
       player.health = 100;
-      player.pos.set(0, 1.7, 20);
+      player.pos.y = 1.7;
+      player.velocityY = 0;
       showNotice("Respawned");
     }
     function unlockWeapon(index) {
@@ -537,16 +666,17 @@
       renderer.domElement.requestPointerLock();
     }
     function blocked(x, z, radius = .42) {
-      if (Math.abs(x) > 49.5 - radius || Math.abs(z) > 49.5 - radius) return true;
       return obstacles.some(o => Math.abs(x - o.x) < o.hx + radius && Math.abs(z - o.z) < o.hz + radius);
     }
     function findBotSpawn() {
       for (let attempt = 0; attempt < 100; attempt++) {
-        const x = (Math.random() - .5) * 88;
-        const z = (Math.random() - .5) * 88;
-        if (!blocked(x, z, .5) && Math.hypot(x - player.pos.x, z - player.pos.z) > 10) return { x, z };
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 25 + Math.random() * 25;
+        const x = player.pos.x + Math.cos(angle) * distance;
+        const z = player.pos.z + Math.sin(angle) * distance;
+        if (!blocked(x, z, .5)) return { x, z };
       }
-      return { x: 0, z: -35 };
+      return { x: player.pos.x + 35, z: player.pos.z };
     }
     function step(now, dt) {
       if (developerMode) player.health = 100;
@@ -564,6 +694,12 @@
           if (!blocked(nx, player.pos.z)) player.pos.x = nx;
           if (!blocked(player.pos.x, nz)) player.pos.z = nz;
         }
+        updateWorldChunks();
+        const groundX = Math.floor(player.pos.x / 100) * 100;
+        const groundZ = Math.floor(player.pos.z / 100) * 100;
+        ground.position.set(groundX, 0, groundZ);
+        grid.position.set(groundX, .015, groundZ);
+        stars.position.set(player.pos.x, 0, player.pos.z);
         if (developerMode) {
           const vertical = (keys.has("Space") ? 1 : 0) - (keys.has("ControlLeft") || keys.has("ControlRight") ? 1 : 0);
           player.pos.y = THREE.MathUtils.clamp(player.pos.y + vertical * (keys.has("ShiftLeft") || keys.has("ShiftRight") ? 18 : 10) * dt, 1.7, 45);
