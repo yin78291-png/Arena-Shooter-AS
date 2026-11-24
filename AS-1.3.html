@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neon Outpost</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --cyan: #62f4e3;
+      --panel: rgba(8, 15, 25, .88);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; background: #101923; color: #eef7ff; }
+    canvas { display: block; }
+    #hud { position: fixed; inset: 0; pointer-events: none; text-shadow: 0 2px 6px #000; }
+    .panel { background: var(--panel); border: 1px solid rgba(98, 244, 227, .32); border-radius: 12px; padding: 12px 15px; backdrop-filter: blur(8px); }
+    #topLeft { position: absolute; top: 16px; left: 16px; min-width: 190px; }
+    #topRight { position: absolute; top: 16px; right: 16px; text-align: right; }
+    #boardToggle { position: absolute; top: 170px; right: 16px; pointer-events: auto; padding: 8px 12px; }
+    #leaderboard { position: absolute; top: 218px; right: 16px; width: 220px; }
+    #leaderboard h2 { margin: 0 0 8px; color: var(--cyan); font-size: 15px; }
+    #leaderboard ol { margin: 0; padding-left: 22px; color: #d3e2ec; font-size: 13px; }
+    #leaderboard li { padding: 2px 0; }
+    .leaderScore { float: right; color: #ffdf80; font-weight: 800; }
+    #shopOverlay { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; padding: 16px; background: rgba(3, 8, 15, .78); }
+    #shopOverlay[hidden] { display: none; }
+    #shopCard { width: min(460px, 100%); max-height: 85vh; overflow: auto; }
+    #shopHeader { display: flex; justify-content: space-between; align-items: center; }
+    #shopHeader h2 { margin: 0; color: var(--cyan); }
+    #shopItems { display: grid; gap: 8px; margin-top: 16px; }
+    .shopItem { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; background: rgba(23, 38, 51, .85); border-radius: 8px; }
+    .shopItem button { padding: 8px 10px; white-space: nowrap; }
+    .shopItem button:disabled { background: #52616a; color: #c3ced4; cursor: default; }
+    #chatOverlay { position: fixed; z-index: 5; left: 16px; bottom: 88px; width: min(390px, calc(100vw - 32px)); }
+    #chatOverlay[hidden] { display: none; }
+    #chatCard { padding: 12px; }
+    #chatHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    #chatHeader h2 { margin: 0; color: var(--cyan); font-size: 16px; }
+    #chatLog { max-height: 160px; min-height: 30px; overflow-y: auto; margin-bottom: 8px; color: #d3e2ec; font-size: 13px; overflow-wrap: anywhere; }
+    #chatLog div { padding: 3px 0; }
+    #chatForm { display: flex; gap: 8px; }
+    #chatInput { min-width: 0; margin: 0; }
+    #chatForm button, #closeChat { padding: 8px 12px; }
+    #devStatus { color: #ffdf80; font-size: 12px; font-weight: 800; }
+    #healthBar { height: 8px; width: 190px; margin-top: 8px; border-radius: 8px; overflow: hidden; background: #263545; }
+    #healthFill { height: 100%; width: 100%; background: linear-gradient(90deg, #41d6a4, #a4ffb1); transition: width .15s; }
+    #weaponName { color: var(--cyan); font-size: 19px; font-weight: 800; }
+    #crosshair { position: absolute; left: 50%; top: 50%; width: 20px; height: 20px; transform: translate(-50%, -50%); }
+    #crosshair::before, #crosshair::after { content: ""; position: absolute; background: white; box-shadow: 0 0 5px #000; }
+    #crosshair::before { width: 2px; height: 18px; left: 9px; top: 1px; }
+    #crosshair::after { height: 2px; width: 18px; top: 9px; left: 1px; }
+    #crosshair.hit::before, #crosshair.hit::after { background: #ff6a78; }
+    #bottom { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); text-align: center; white-space: nowrap; }
+    #hint { color: #c3d1df; font-size: 13px; margin-top: 7px; }
+    #notice { position: absolute; top: 23%; left: 50%; transform: translateX(-50%); color: var(--cyan); font-size: 17px; font-weight: 800; }
+    #overlay { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(22, 42, 59, .82), rgba(4, 9, 15, .95)); z-index: 3; }
+    #card { width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 24px); overflow-y: auto; padding: 30px; text-align: center; }
+    h1 { margin: 0 0 8px; font-size: clamp(32px, 7vw, 54px); letter-spacing: .08em; }
+    #card p { color: #b7c8d8; line-height: 1.55; }
+    .roomRow { display: flex; gap: 8px; margin: 20px 0 12px; }
+    input, button { border-radius: 8px; font: inherit; }
+    input { min-width: 0; flex: 1; padding: 12px; color: white; background: #101e2b; border: 1px solid #375367; }
+    button { padding: 12px 20px; border: 0; color: #06201f; background: var(--cyan); font-weight: 900; cursor: pointer; }
+    button:hover { filter: brightness(1.12); }
+    .small { font-size: 12px; color: #91a5b7 !important; }
+    #roster { display: block; margin-top: 5px; color: #bbd0df; font-size: 13px; }
+    @media (max-width: 760px), (pointer: coarse) {
+      #bottom { display: none; }
+      #boardToggle { top: 88px; right: 12px; bottom: auto; font-size: 11px; padding: 8px; }
+      #leaderboard { top: 136px; right: 12px; bottom: auto; width: 180px; }
+      #topLeft { top: 10px; left: 10px; }
+      #topRight { top: 10px; right: 10px; }
+      #chatOverlay { bottom: 150px; }
+    }
+    @media (max-width: 550px) {
+      #topLeft { min-width: 0; }
+      #healthBar { width: 145px; }
+      #topRight { max-width: 150px; }
+      #hint { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay">
+    <div id="card" class="panel">
+      <h1>NEON OUTPOST</h1>
+      <p>Drop into the arena, test six weapons, and keep an eye on your health. Open another tab on this device and join the same room to play together.</p>
+      <div class="roomRow">
+        <input id="nameInput" maxlength="20" placeholder="Player name" aria-label="Player name">
+      </div>
+      <div class="roomRow">
+        <input id="roomInput" maxlength="24" placeholder="Enter a friend's room code or use yours" aria-label="Room code">
+        <button id="startButton">ENTER ARENA</button>
+      </div>
+      <div class="panel" style="text-align:left"><strong>ALL-TIME LEADERBOARD</strong><ol id="menuLeaderboard"></ol></div>
+      <p class="small">WASD move · Mouse aim · Click fire · Space jump · Shift sprint<br>1–6 or mouse wheel switch weapons · L gun shop · T chat</p>
+      <p class="small">Five extra guns cost 200 points each; earn 100 points per enemy · E heals at the green station</p>
+      <p class="small">Your name, unlocked guns, points, and leaderboard are saved in this browser.</p>
+      <p class="small">A fresh room code is generated each time this page loads. Share your code with friends, or enter their code to join their room. Multiplayer works between tabs/windows of this browser; internet matchmaking needs a game server.</p>
+    </div>
+  </div>
+  <div id="hud">
+    <div id="topLeft" class="panel">HEALTH <strong id="healthText">100</strong><div id="healthBar"><div id="healthFill"></div></div><span id="roster">Solo arena</span><span id="roomCodeLabel"></span><span id="devStatus"></span></div>
+    <div id="topRight" class="panel"><div id="weaponName">PULSE RIFLE</div><div id="ammoText">∞ &nbsp; · &nbsp; 1 / 6</div><div id="scoreText">Points 0 · KOs 0</div></div>
+    <button id="boardToggle">LEADERBOARD</button>
+    <div id="leaderboard" class="panel" hidden><h2>ALL-TIME BEST</h2><ol id="gameLeaderboard"></ol></div>
+    <div id="crosshair"></div>
+    <div id="notice"></div>
+    <div id="bottom" class="panel"><div id="hint">WASD move · Space jump · Shift sprint · E heal · L gun shop · T chat</div></div>
+  </div>
+  <div id="chatOverlay" hidden>
+    <div id="chatCard" class="panel">
+      <div id="chatHeader"><h2>CHAT</h2><button type="button" id="closeChat">CLOSE</button></div>
+      <div id="chatLog" aria-live="polite"></div>
+      <form id="chatForm">
+        <input id="chatInput" type="text" maxlength="160" autocomplete="off" spellcheck="false" aria-label="Chat message" placeholder="Type a message...">
+        <button type="submit">SEND</button>
+      </form>
+    </div>
+  </div>
+  <div id="shopOverlay" hidden>
+    <div id="shopCard" class="panel">
+      <div id="shopHeader"><h2>GUN SHOP</h2><button id="closeShop">CLOSE (L)</button></div>
+      <p id="shopPoints"></p>
+      <div id="shopItems"></div>
+    </div>
+  </div>
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+
+    const weapons = [
+      { name: "PULSE RIFLE", damage: 25, rate: 180, range: 75, color: 0x62f4e3 },
+      { name: "SCOUT", damage: 65, rate: 650, range: 110, color: 0xffd166 },
+      { name: "BURST", damage: 18, rate: 95, range: 60, color: 0xb69cff },
+      { name: "HEAVY", damage: 48, rate: 480, range: 70, color: 0xff9273 },
+      { name: "SIDEARM", damage: 30, rate: 300, range: 55, color: 0xf3f6ff },
+      { name: "RAIL", damage: 100, rate: 950, range: 140, color: 0xff5e91 }
+    ];
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x07101f);
+    scene.fog = new THREE.Fog(0x101b2c, 100, 220);
+    const camera = new THREE.PerspectiveCamera(76, innerWidth / innerHeight, .1, 260);
+    camera.rotation.order = "YXZ";
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+    scene.add(new THREE.HemisphereLight(0x809cc9, 0x18202d, 1.4));
+    const moon = new THREE.DirectionalLight(0xc5d7ff, 1.8);
+    moon.position.set(-30, 45, 20);
+    moon.castShadow = true;
+    moon.shadow.mapSize.set(1024, 1024);
+    scene.add(moon);
+    const starPositions = [];
+    for (let i = 0; i < 1800; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const height = .08 + Math.random() * .92;
+      const radius = Math.sqrt(1 - height * height) * 165;
+      starPositions.push(Math.cos(angle) * radius, height * 165, Math.sin(angle) * radius);
+    }
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
+    scene.add(new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xe7f0ff, size: 1.2, sizeAttenuation: false, transparent: true, opacity: .9, fog: false })));
+
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ color: 0x3b4653, roughness: .93 }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+    const grid = new THREE.GridHelper(200, 100, 0x566879, 0x3c4b5c);
+    grid.position.y = .015;
+    scene.add(grid);
+
+    const obstacles = [];
+    function box(x, y, z, sx, sy, sz, color, solid = true) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), new THREE.MeshStandardMaterial({ color, roughness: .76 }));
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      if (solid) obstacles.push({ x, z, hx: sx / 2, hz: sz / 2, h: sy });
+      return mesh;
+    }
+    box(0, 2, -50, 100, 4, 1, 0x3c4b5b);
+    box(0, 2, 50, 100, 4, 1, 0x3c4b5b);
+    box(-50, 2, 0, 1, 4, 100, 0x3c4b5b);
+    box(50, 2, 0, 1, 4, 100, 0x3c4b5b);
+    function buildBuilding(x, z, width, depth, color) {
+      const height = 10;
+      const wall = .7;
+      const door = 3.2;
+      const sideLength = (width - door) / 2;
+      box(x, .12, z, width - wall, .24, depth - wall, 0x737f79, false);
+      box(x - width / 2 + wall / 2, height / 2, z, wall, height, depth, color);
+      box(x + width / 2 - wall / 2, height / 2, z, wall, height, depth, color);
+      box(x, height / 2, z - depth / 2 + wall / 2, width, height, wall, color);
+      box(x - (door + sideLength) / 2, height / 2, z + depth / 2 - wall / 2, sideLength, height, wall, color);
+      box(x + (door + sideLength) / 2, height / 2, z + depth / 2 - wall / 2, sideLength, height, wall, color);
+      box(x, height - wall / 2, z, width, wall, depth, color, false);
+      box(x, height - .35, z + depth / 2 - wall / 2, door, .7, wall, color, false);
+      box(x - 2.7, 5.3, z + depth / 2 - wall / 2 - .03, 1.8, 2.2, .08, 0x263c51, false);
+      box(x + 2.7, 5.3, z + depth / 2 - wall / 2 - .03, 1.8, 2.2, .08, 0x263c51, false);
+      box(x - 2.7, 8, z + depth / 2 - wall / 2 - .03, 1.8, 1.2, .08, 0x263c51, false);
+      box(x + 2.7, 8, z + depth / 2 - wall / 2 - .03, 1.8, 1.2, .08, 0x263c51, false);
+    }
+    buildBuilding(-10, -8, 10, 9, 0x52636c);
+    buildBuilding(9, 7, 10, 9, 0x59666e);
+    box(4, .8, -15, 3, 1.6, 7, 0x52636c);
+    buildBuilding(-16, 13, 8, 8, 0x58696c);
+
+    const station = new THREE.Group();
+    station.position.set(0, 0, 0);
+    const stationBase = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.5, .25, 16), new THREE.MeshStandardMaterial({ color: 0x32d892, emissive: 0x0b7048, emissiveIntensity: .8 }));
+    stationBase.position.y = .13;
+    station.add(stationBase);
+    const stationPillar = new THREE.Mesh(new THREE.CylinderGeometry(.13, .18, 2.4, 10), new THREE.MeshStandardMaterial({ color: 0xaaffd5, emissive: 0x25d989, emissiveIntensity: .5 }));
+    stationPillar.position.y = 1.4;
+    station.add(stationPillar);
+    const stationLight = new THREE.PointLight(0x35ffad, 9, 9);
+    stationLight.position.y = 1.4;
+    station.add(stationLight);
+    scene.add(station);
+    const stationRing = new THREE.Mesh(new THREE.TorusGeometry(1.75, .045, 8, 48), new THREE.MeshBasicMaterial({ color: 0x65ffc0 }));
+    stationRing.rotation.x = Math.PI / 2;
+    stationRing.position.y = .08;
+    scene.add(stationRing);
+
+    const savedPlayer = JSON.parse(localStorage.getItem("neon-outpost-player-v1") || "{}");
+    const player = { pos: new THREE.Vector3(0, 1.7, 20), velocityY: 0, yaw: Math.PI, pitch: 0, health: 100, weapon: 0, points: Number.isFinite(savedPlayer.points) ? Math.max(0, savedPlayer.points) : 0, kills: 0, unlocked: Array.isArray(savedPlayer.unlocked) ? [...new Set([0, ...savedPlayer.unlocked.filter(i => Number.isInteger(i) && i >= 0 && i < weapons.length)])] : [0], name: typeof savedPlayer.name === "string" ? savedPlayer.name.slice(0, 20) : "", onGround: true };
+    const leaderboard = JSON.parse(localStorage.getItem("neon-outpost-leaderboard-v1") || "[]");
+    const playerId = Math.random().toString(36).slice(2);
+    const keys = new Set();
+    const bots = [];
+    const remotes = new Map();
+    const raycaster = new THREE.Raycaster();
+    function createRoomCode() {
+      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      const previous = localStorage.getItem("neon-outpost-last-room-code");
+      let code;
+      do {
+        const bytes = new Uint8Array(6);
+        crypto.getRandomValues(bytes);
+        code = Array.from(bytes, byte => alphabet[byte % alphabet.length]).join("");
+      } while (code === previous);
+      localStorage.setItem("neon-outpost-last-room-code", code);
+      return code;
+    }
+    let currentRoomCode = createRoomCode();
+    document.getElementById("roomInput").value = currentRoomCode;
+    let active = false;
+    let lastShot = 0;
+    let lastState = 0;
+    let channel = null;
+    let noticeTimeout = 0;
+    let firing = false;
+    let shopOpen = false;
+    let chatOpen = false;
+    let developerMode = false;
+    document.getElementById("nameInput").value = player.name;
+
+    function savePlayer() {
+      localStorage.setItem("neon-outpost-player-v1", JSON.stringify({ name: player.name, points: player.points, unlocked: player.unlocked }));
+    }
+    function renderLeaderboard() {
+      const entries = leaderboard.slice().sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 10);
+      for (const id of ["menuLeaderboard", "gameLeaderboard"]) {
+        const list = document.getElementById(id);
+        list.replaceChildren();
+        for (const entry of entries) {
+          const item = document.createElement("li");
+          const name = document.createElement("span");
+          name.textContent = entry.name;
+          const score = document.createElement("span");
+          score.className = "leaderScore";
+          score.textContent = `${entry.score} pts`;
+          item.append(name, score);
+          list.append(item);
+        }
+        if (!entries.length) {
+          const item = document.createElement("li");
+          item.textContent = "No scores yet";
+          list.append(item);
+        }
+      }
+    }
+    function recordBest() {
+      if (!player.name) return;
+      const existing = leaderboard.find(entry => entry.name.toLowerCase() === player.name.toLowerCase());
+      if (existing) existing.score = Math.max(existing.score, player.points);
+      else leaderboard.push({ name: player.name, score: player.points });
+      localStorage.setItem("neon-outpost-leaderboard-v1", JSON.stringify(leaderboard));
+      renderLeaderboard();
+    }
+
+    function makeBot(x, z, index) {
+      const group = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(.48, .85, 4, 8), new THREE.MeshStandardMaterial({ color: [0xe46c73, 0xe7a34f, 0xc36be0][index % 3], roughness: .6 }));
+      body.position.y = .9;
+      body.castShadow = true;
+      group.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(.3, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffc7aa }));
+      head.position.y = 1.72;
+      group.add(head);
+      group.position.set(x, 0, z);
+      scene.add(group);
+      const bot = { group, health: 100, alive: true, nextAttack: 0, body, head };
+      body.userData.bot = bot;
+      head.userData.bot = bot;
+      bots.push(bot);
+    }
+    [[-17, -17], [16, -14], [-19, 3], [18, 18], [2, -22], [-5, 18]].forEach((p, i) => makeBot(p[0], p[1], i));
+
+    function showNotice(text) {
+      const el = document.getElementById("notice");
+      el.textContent = text;
+      clearTimeout(noticeTimeout);
+      noticeTimeout = setTimeout(() => { el.textContent = ""; }, 1600);
+    }
+    function appendChatMessage(name, message) {
+      const log = document.getElementById("chatLog");
+      const line = document.createElement("div");
+      line.textContent = `${name}: ${message}`;
+      log.append(line);
+      while (log.children.length > 30) log.firstElementChild.remove();
+      log.scrollTop = log.scrollHeight;
+    }
+    function updateHud() {
+      document.getElementById("healthText").textContent = Math.ceil(player.health);
+      document.getElementById("healthFill").style.width = `${player.health}%`;
+      document.getElementById("devStatus").textContent = developerMode ? " · DEV MODE: FLY / INVINCIBLE" : "";
+      document.getElementById("weaponName").textContent = weapons[player.weapon].name;
+      document.getElementById("ammoText").textContent = player.unlocked.includes(player.weapon) ? `∞ · ${player.weapon + 1} / 6 · ${player.points} pts` : `LOCKED · 200 pts · ${player.points} pts`;
+      document.getElementById("scoreText").textContent = `Points ${player.points} · KOs ${player.kills}`;
+      document.getElementById("roster").textContent = remotes.size ? `${remotes.size + 1} in room` : "Solo arena";
+      document.getElementById("roomCodeLabel").textContent = `ROOM CODE: ${currentRoomCode}`;
+    }
+    function announce(type, extra = {}) {
+      if (channel) channel.postMessage({ type, id: playerId, ...extra });
+    }
+    function openRoom(room) {
+      if (channel) channel.close();
+      if ("BroadcastChannel" in window) {
+        channel = new BroadcastChannel(`neon-outpost:${room.toLowerCase()}`);
+        channel.onmessage = ({ data }) => {
+          if (!data || data.id === playerId) return;
+          if (data.type === "state") {
+            let remote = remotes.get(data.id);
+            if (!remote) {
+              const group = new THREE.Group();
+              const body = new THREE.Mesh(new THREE.CapsuleGeometry(.45, .85, 4, 8), new THREE.MeshStandardMaterial({ color: 0x58a6ff, emissive: 0x102f59 }));
+              body.position.y = .9;
+              const head = new THREE.Mesh(new THREE.SphereGeometry(.29, 12, 10), new THREE.MeshStandardMaterial({ color: 0xaed8ff }));
+              head.position.y = 1.72;
+              group.add(body, head);
+              scene.add(group);
+              remote = { group, health: 100, lastSeen: performance.now() };
+              remotes.set(data.id, remote);
+            }
+            remote.group.position.set(data.x, 0, data.z);
+            remote.group.rotation.y = data.yaw;
+            remote.health = data.health;
+            remote.lastSeen = performance.now();
+            if (data.name) remote.name = data.name;
+          } else if (data.type === "shot") {
+            drawShot(new THREE.Vector3(data.x, data.y, data.z), new THREE.Vector3(data.dx, data.dy, data.dz), data.color);
+            const origin = new THREE.Vector3(data.x, data.y, data.z);
+            const direction = new THREE.Vector3(data.dx, data.dy, data.dz).normalize();
+            const toPlayer = player.pos.clone().add(new THREE.Vector3(0, -.55, 0)).sub(origin);
+            const along = toPlayer.dot(direction);
+            const closest = origin.clone().addScaledVector(direction, along);
+            if (along > 0 && along < 100 && closest.distanceTo(player.pos.clone().add(new THREE.Vector3(0, -.55, 0))) < .75) {
+              if (!developerMode) {
+                player.health = Math.max(0, player.health - (data.damage || 10));
+                if (!player.health) respawn();
+              }
+              updateHud();
+            }
+          } else if (data.type === "bye") {
+            const remote = remotes.get(data.id);
+            if (remote) scene.remove(remote.group);
+            remotes.delete(data.id);
+          } else if (data.type === "chat" && typeof data.message === "string" && typeof data.name === "string") {
+            appendChatMessage(data.name.slice(0, 20), data.message.slice(0, 160));
+          }
+          updateHud();
+        };
+        announce("hello");
+      } else {
+        showNotice("Multiplayer is unavailable in this browser.");
+      }
+    }
+    function sendState(now) {
+      if (now - lastState < 100) return;
+      lastState = now;
+      announce("state", { x: player.pos.x, z: player.pos.z, yaw: player.yaw, health: player.health });
+      for (const [id, remote] of remotes) {
+        if (now - remote.lastSeen > 5000) {
+          scene.remove(remote.group);
+          remotes.delete(id);
+        }
+      }
+    }
+
+    function drawShot(origin, direction, color) {
+      const end = origin.clone().addScaledVector(direction, 2.5);
+      const geometry = new THREE.BufferGeometry().setFromPoints([origin, end]);
+      const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: color || 0x62f4e3, transparent: true, opacity: .9 }));
+      scene.add(line);
+      setTimeout(() => { scene.remove(line); geometry.dispose(); }, 90);
+    }
+    function fire() {
+      const now = performance.now();
+      const weapon = weapons[player.weapon];
+      if (!active || now - lastShot < weapon.rate) return;
+      lastShot = now;
+      const origin = camera.position.clone();
+      const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+      drawShot(origin, direction, weapon.color);
+      raycaster.set(origin, direction);
+      raycaster.far = weapon.range;
+      const targets = [];
+      for (const bot of bots) if (bot.alive) targets.push(...bot.group.children);
+      for (const remote of remotes.values()) targets.push(...remote.group.children);
+      const hit = raycaster.intersectObjects(targets, false)[0];
+      if (hit && hit.object.userData.bot) {
+        const bot = hit.object.userData.bot;
+        bot.health -= weapon.damage;
+        if (bot.health <= 0) {
+          bot.alive = false;
+          bot.group.visible = false;
+          player.kills++;
+          player.points += 100;
+          savePlayer();
+          recordBest();
+          updateHud();
+          setTimeout(() => {
+            bot.health = 100;
+            bot.alive = true;
+            bot.group.visible = true;
+              const spawn = findBotSpawn();
+              bot.group.position.set(spawn.x, 0, spawn.z);
+          }, 3500);
+        }
+        flashHit();
+      }
+      announce("shot", { x: origin.x, y: origin.y, z: origin.z, dx: direction.x, dy: direction.y, dz: direction.z, color: weapon.color, damage: weapon.damage });
+    }
+    function flashHit() {
+      const crosshair = document.getElementById("crosshair");
+      crosshair.classList.add("hit");
+      setTimeout(() => crosshair.classList.remove("hit"), 110);
+    }
+    function respawn() {
+      player.health = 100;
+      player.pos.set(0, 1.7, 20);
+      showNotice("Respawned");
+    }
+    function unlockWeapon(index) {
+      if (player.unlocked.includes(index)) return true;
+      if (player.points < 200) {
+        showNotice(`${weapons[index].name}: need ${200 - player.points} more points`);
+        return false;
+      }
+      player.points -= 200;
+      player.unlocked.push(index);
+      savePlayer();
+      recordBest();
+      return true;
+    }
+    function switchWeapon(index) {
+      const next = (index + weapons.length) % weapons.length;
+      if (!unlockWeapon(next)) {
+        updateHud();
+        return;
+      }
+      player.weapon = next;
+      updateHud();
+      showNotice(weapons[player.weapon].name);
+    }
+    function renderShop() {
+      document.getElementById("shopPoints").textContent = `Your points: ${player.points}`;
+      const items = document.getElementById("shopItems");
+      items.replaceChildren();
+      weapons.forEach((weapon, index) => {
+        const row = document.createElement("div");
+        row.className = "shopItem";
+        const label = document.createElement("span");
+        label.textContent = `${index + 1}. ${weapon.name}${index === 0 ? " · STARTER" : ""}`;
+        const button = document.createElement("button");
+        const owned = player.unlocked.includes(index);
+        button.textContent = owned ? (player.weapon === index ? "EQUIPPED" : "SELECT") : "UNLOCK · 200 PTS";
+        button.disabled = player.weapon === index || (!owned && player.points < 200);
+        button.addEventListener("click", () => {
+          if (!owned) unlockWeapon(index);
+          if (player.unlocked.includes(index)) {
+            player.weapon = index;
+            updateHud();
+            showNotice(`${weapon.name} equipped`);
+          }
+          renderShop();
+        });
+        row.append(label, button);
+        items.append(row);
+      });
+    }
+    function openShop() {
+      if (!active || shopOpen) return;
+      shopOpen = true;
+      keys.clear();
+      firing = false;
+      renderShop();
+      document.getElementById("shopOverlay").hidden = false;
+      document.exitPointerLock();
+    }
+    function closeShop() {
+      if (!shopOpen) return;
+      shopOpen = false;
+      document.getElementById("shopOverlay").hidden = true;
+      renderer.domElement.requestPointerLock();
+    }
+    function openChat() {
+      if (!active || shopOpen || chatOpen) return;
+      chatOpen = true;
+      keys.clear();
+      firing = false;
+      document.getElementById("chatOverlay").hidden = false;
+      document.exitPointerLock();
+      document.getElementById("chatInput").focus();
+    }
+    function closeChat() {
+      if (!chatOpen) return;
+      chatOpen = false;
+      document.getElementById("chatOverlay").hidden = true;
+      renderer.domElement.requestPointerLock();
+    }
+    function blocked(x, z, radius = .42) {
+      if (Math.abs(x) > 49.5 - radius || Math.abs(z) > 49.5 - radius) return true;
+      return obstacles.some(o => Math.abs(x - o.x) < o.hx + radius && Math.abs(z - o.z) < o.hz + radius);
+    }
+    function findBotSpawn() {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const x = (Math.random() - .5) * 88;
+        const z = (Math.random() - .5) * 88;
+        if (!blocked(x, z, .5) && Math.hypot(x - player.pos.x, z - player.pos.z) > 10) return { x, z };
+      }
+      return { x: 0, z: -35 };
+    }
+    function step(now, dt) {
+      if (developerMode) player.health = 100;
+      if (active && !shopOpen && !chatOpen) {
+        const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+        const right = new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+        const move = new THREE.Vector3();
+        if (keys.has("KeyW")) move.add(forward);
+        if (keys.has("KeyS")) move.sub(forward);
+        if (keys.has("KeyD")) move.add(right);
+        if (keys.has("KeyA")) move.sub(right);
+        if (move.lengthSq()) {
+          move.normalize().multiplyScalar((keys.has("ShiftLeft") || keys.has("ShiftRight") ? 10 : 6) * dt);
+          const nx = player.pos.x + move.x, nz = player.pos.z + move.z;
+          if (!blocked(nx, player.pos.z)) player.pos.x = nx;
+          if (!blocked(player.pos.x, nz)) player.pos.z = nz;
+        }
+        if (developerMode) {
+          const vertical = (keys.has("Space") ? 1 : 0) - (keys.has("ControlLeft") || keys.has("ControlRight") ? 1 : 0);
+          player.pos.y = THREE.MathUtils.clamp(player.pos.y + vertical * (keys.has("ShiftLeft") || keys.has("ShiftRight") ? 18 : 10) * dt, 1.7, 45);
+          player.velocityY = 0;
+        } else {
+          player.velocityY -= 19 * dt;
+          player.pos.y += player.velocityY * dt;
+          if (player.pos.y <= 1.7) { player.pos.y = 1.7; player.velocityY = 0; player.onGround = true; }
+        }
+        camera.position.copy(player.pos);
+        camera.rotation.set(player.pitch, player.yaw, 0, "YXZ");
+        if (firing) fire();
+        if (keys.has("KeyE") && Math.hypot(player.pos.x, player.pos.z) < 2.6 && player.health < 100) {
+          player.health = Math.min(100, player.health + 24 * dt);
+          updateHud();
+        }
+        for (const bot of bots) {
+          if (!bot.alive) continue;
+          const dx = player.pos.x - bot.group.position.x, dz = player.pos.z - bot.group.position.z;
+          const distance = Math.hypot(dx, dz);
+          if (distance > 4) {
+            const speed = distance < 13 ? 1.3 : .65;
+            const moveX = dx / distance * speed * dt;
+            const moveZ = dz / distance * speed * dt;
+            if (!blocked(bot.group.position.x + moveX, bot.group.position.z, .5)) bot.group.position.x += moveX;
+            if (!blocked(bot.group.position.x, bot.group.position.z + moveZ, .5)) bot.group.position.z += moveZ;
+            bot.group.rotation.y = Math.atan2(dx, dz);
+          } else if (now > bot.nextAttack) {
+            bot.nextAttack = now + 1050;
+            if (!developerMode) {
+              player.health = Math.max(0, player.health - 7);
+              if (!player.health) respawn();
+            }
+            updateHud();
+          }
+        }
+        sendState(now);
+      }
+      stationPillar.rotation.y += dt * 1.2;
+      stationRing.rotation.z += dt * .7;
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+    let previous = performance.now();
+    function animate(now) {
+      const dt = Math.min((now - previous) / 1000, .05);
+      previous = now;
+      step(now, dt);
+    }
+    requestAnimationFrame(animate);
+
+    document.getElementById("startButton").addEventListener("click", () => {
+      currentRoomCode = document.getElementById("roomInput").value.trim().replace(/[^a-z0-9_-]/gi, "").slice(0, 24).toUpperCase() || currentRoomCode;
+      document.getElementById("roomInput").value = currentRoomCode;
+      player.name = document.getElementById("nameInput").value.trim().slice(0, 20) || "Rookie";
+      document.getElementById("nameInput").value = player.name;
+      savePlayer();
+      recordBest();
+      openRoom(currentRoomCode);
+      active = true;
+      document.getElementById("overlay").style.display = "none";
+      renderer.domElement.requestPointerLock();
+      updateHud();
+    });
+    document.getElementById("closeShop").addEventListener("click", closeShop);
+    document.getElementById("chatForm").addEventListener("submit", event => {
+      event.preventDefault();
+      const message = document.getElementById("chatInput").value.trim();
+      if (!message) return;
+      if (message === "ASdev") {
+        if (developerMode) {
+          appendChatMessage("SYSTEM", "Developer mode is already enabled.");
+          document.getElementById("chatInput").value = "";
+          return;
+        }
+        developerMode = true;
+        player.health = 100;
+        updateHud();
+        showNotice("Developer mode enabled · Space up · Ctrl down");
+        appendChatMessage("SYSTEM", "Developer mode enabled.");
+        document.getElementById("chatInput").value = "";
+        closeChat();
+      } else {
+        appendChatMessage(player.name, message);
+        announce("chat", { name: player.name, message });
+        document.getElementById("chatInput").value = "";
+      }
+    });
+    document.getElementById("closeChat").addEventListener("click", closeChat);
+    document.addEventListener("pointerlockchange", () => {
+      if (document.pointerLockElement !== renderer.domElement) {
+        firing = false;
+        if (shopOpen) return;
+        if (chatOpen) return;
+        if (active) {
+          document.getElementById("overlay").style.display = "grid";
+          document.getElementById("startButton").textContent = "RESUME";
+        }
+      }
+    });
+    document.addEventListener("mousemove", event => {
+      if (!active || document.pointerLockElement !== renderer.domElement) return;
+      player.yaw -= event.movementX * .0022;
+      player.pitch = THREE.MathUtils.clamp(player.pitch - event.movementY * .0022, -1.45, 1.45);
+    });
+    document.addEventListener("keydown", event => {
+      if (chatOpen) {
+        if (event.code === "Escape") closeChat();
+        return;
+      }
+      if (event.code === "KeyL" && active && !event.repeat) {
+        if (shopOpen) closeShop();
+        else openShop();
+        return;
+      }
+      if (event.code === "KeyT" && active && !event.repeat) {
+        openChat();
+        return;
+      }
+      if (shopOpen) {
+        if (event.code === "Escape") closeShop();
+        return;
+      }
+      keys.add(event.code);
+      if (["Space", "ArrowUp", "ArrowDown"].includes(event.code)) event.preventDefault();
+      if (event.code.startsWith("Digit")) {
+        const index = Number(event.code.slice(5)) - 1;
+        if (index >= 0 && index < 6) switchWeapon(index);
+      }
+      if (event.code === "Space" && !developerMode && player.onGround && active) {
+        player.velocityY = 7.3;
+        player.onGround = false;
+      }
+    });
+    document.addEventListener("keyup", event => keys.delete(event.code));
+    document.addEventListener("mousedown", event => {
+      if (event.button === 0 && active && !shopOpen && document.pointerLockElement === renderer.domElement) firing = true;
+    });
+    document.addEventListener("mouseup", event => { if (event.button === 0) firing = false; });
+    document.addEventListener("wheel", event => {
+      if (active && !shopOpen) switchWeapon(player.weapon + (event.deltaY > 0 ? 1 : -1));
+    }, { passive: true });
+    document.getElementById("boardToggle").addEventListener("click", () => {
+      const board = document.getElementById("leaderboard");
+      board.hidden = !board.hidden;
+    });
+    window.addEventListener("blur", () => { keys.clear(); firing = false; });
+    window.addEventListener("beforeunload", () => {
+      active = false;
+      announce("bye");
+      if (channel) channel.close();
+    });
+    window.addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    updateHud();
+    renderLeaderboard();
+  </script>
+</body>
+</html>
