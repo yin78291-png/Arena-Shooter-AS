@@ -1,4 +1,7 @@
-Arena Shooter
+                      Arena Shooter
+
+
+                      
 WASD move · Mouse aim · Click fire · Space jump · Shift sprint
 1–6 or mouse wheel switch weapons · L gun shop · T chat
 
