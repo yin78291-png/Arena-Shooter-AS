@@ -1,1 +1,1 @@
-[Download](https://github.com/yin78291-png/Arena-Shooter-AS/archive/refs/heads/main.zip)
+curl -L -o Arena-Shooter-AS.zip "https://github.com/yin78291-png/Arena-Shooter-AS/archive/refs/heads/main.zip"
