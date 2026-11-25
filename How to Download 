@@ -1,14 +1,13 @@
-# Download with npm
+# Download
 
-Install [Node.js](https://nodejs.org/) (which includes npm), then run:
+To download the game ZIP, run this command in a terminal:
 
 ```bash
-npx degit yin78291-png/Arena-Shooter-AS arena-shooter-as
-cd arena-shooter-as
+curl -L -o Arena-Shooter-AS.zip "https://github.com/yin78291-png/Arena-Shooter-AS/archive/refs/heads/main.zip"
 ```
 
-Open `aren1.5.html` in your browser to play.
+Then extract `Arena-Shooter-AS.zip` and open `aren1.5.html` in your browser.
 
-## Download as ZIP
+> This command uses `curl`, not npm. You do not need npm to download or play the game.
 
 [Download the repository as a ZIP file](https://github.com/yin78291-png/Arena-Shooter-AS/archive/refs/heads/main.zip)
