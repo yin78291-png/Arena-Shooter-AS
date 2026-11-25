@@ -1,0 +1,14 @@
+# Download with npm
+
+Install [Node.js](https://nodejs.org/) (which includes npm), then run:
+
+```bash
+npx degit yin78291-png/Arena-Shooter-AS arena-shooter-as
+cd arena-shooter-as
+```
+
+Open `aren1.5.html` in your browser to play.
+
+## Download as ZIP
+
+[Download the repository as a ZIP file](https://github.com/yin78291-png/Arena-Shooter-AS/archive/refs/heads/main.zip)
