@@ -86,7 +86,7 @@
   <div id="overlay">
     <div id="card" class="panel">
       <h1>NEON OUTPOST</h1>
-      <p>Drop into the arena, test six weapons, and keep an eye on your health. Open another tab on this device and join the same room to play together.</p>
+      <p>Drop into the arena, try nine weapons, and keep an eye on your health. Play with a friend on the same Wi-Fi by joining the same room code.</p>
       <div class="roomRow">
         <input id="nameInput" maxlength="20" placeholder="Player name" aria-label="Player name">
       </div>
@@ -95,15 +95,15 @@
         <button id="startButton">ENTER ARENA</button>
       </div>
       <div class="panel" style="text-align:left"><strong>ALL-TIME LEADERBOARD</strong><ol id="menuLeaderboard"></ol></div>
-      <p class="small">WASD move · Mouse aim · Click fire · Space jump · Shift sprint<br>1–6 or mouse wheel switch weapons · L gun shop · T chat</p>
-      <p class="small">Five extra guns cost 200 points each; earn 50 points per enemy · E heals at the green station</p>
+      <p class="small">WASD move · Mouse aim · Click fire · Space jump · Shift sprint<br>1–9 or mouse wheel switch weapons · L gun shop · T chat</p>
+      <p class="small">Eight extra guns cost 200 points each; earn 50 points per enemy · E heals at the green station or inside any building</p>
       <p class="small">Your name, unlocked guns, points, and leaderboard are saved in this browser.</p>
       <p class="small">For same-Wi-Fi multiplayer, run start-server.bat on the host laptop. Open the LAN address it prints on every laptop, then enter the same room code. Keep the server window open. The standalone file only connects browser tabs on one device.</p>
     </div>
   </div>
   <div id="hud">
     <div id="topLeft" class="panel">HEALTH <strong id="healthText">100</strong><div id="healthBar"><div id="healthFill"></div></div><span id="roster">Solo arena</span><span id="roomCodeLabel"></span><span id="devStatus"></span></div>
-    <div id="topRight" class="panel"><div id="weaponName">PULSE RIFLE</div><div id="ammoText">∞ &nbsp; · &nbsp; 1 / 6</div><div id="scoreText">Points 0 · KOs 0</div></div>
+    <div id="topRight" class="panel"><div id="weaponName">PULSE RIFLE</div><div id="ammoText">∞ &nbsp; · &nbsp; 1 / 9</div><div id="scoreText">Points 0 · KOs 0</div></div>
     <button id="boardToggle">LEADERBOARD</button>
     <div id="leaderboard" class="panel" hidden><h2>ALL-TIME BEST</h2><ol id="gameLeaderboard"></ol></div>
     <div id="crosshair"></div>
@@ -136,7 +136,10 @@
       { name: "BURST", damage: 18, rate: 95, range: 60, color: 0xb69cff },
       { name: "HEAVY", damage: 48, rate: 480, range: 70, color: 0xff9273 },
       { name: "SIDEARM", damage: 30, rate: 300, range: 55, color: 0xf3f6ff },
-      { name: "RAIL", damage: 100, rate: 950, range: 140, color: 0xff5e91 }
+      { name: "RAIL", damage: 100, rate: 950, range: 140, color: 0xff5e91 },
+      { name: "SMG", damage: 13, rate: 80, range: 55, color: 0x8cff73 },
+      { name: "AA-12", damage: 14, rate: 620, range: 38, color: 0xffb45c, pellets: 8, spread: .065 },
+      { name: "MINIGUN", damage: 10, rate: 55, range: 70, color: 0xff5e4d }
     ];
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x07101f);
@@ -176,6 +179,7 @@
     scene.add(grid);
 
     const obstacles = [];
+    const healZones = [];
     const worldChunks = new Map();
     const worldChunkSize = 100;
     let loadedChunkCenterX = null;
@@ -194,7 +198,10 @@
       const wall = .7;
       const door = 3.2;
       const sideLength = (width - door) / 2;
+      healZones.push({ x, z, hx: width / 2 - wall - .4, hz: depth / 2 - wall - .4, owner: parent });
       box(x, .12, z, width - wall, .24, depth - wall, 0x737f79, false, parent);
+      box(x - width / 2 + wall + .9, .65, z - depth / 2 + wall + .9, .65, 1.3, .65, 0x32d892, false, parent);
+      box(x - width / 2 + wall + .9, 1.34, z - depth / 2 + wall + .9, .8, .08, .8, 0xaaffd5, false, parent);
       box(x - width / 2 + wall / 2, height / 2, z, wall, height, depth, color, true, parent);
       box(x + width / 2 - wall / 2, height / 2, z, wall, height, depth, color, true, parent);
       box(x, height / 2, z - depth / 2 + wall / 2, width, height, wall, color, true, parent);
@@ -271,6 +278,9 @@
           for (let i = obstacles.length - 1; i >= 0; i--) {
             if (obstacles[i].owner === group) obstacles.splice(i, 1);
           }
+          for (let i = healZones.length - 1; i >= 0; i--) {
+            if (healZones[i].owner === group) healZones.splice(i, 1);
+          }
         }
         worldChunks.delete(key);
       }
@@ -299,6 +309,7 @@
     const playerId = Math.random().toString(36).slice(2);
     const keys = new Set();
     const bots = [];
+    const enemySpawnRadius = 48;
     const remotes = new Map();
     const raycaster = new THREE.Raycaster();
     function createRoomCode() {
@@ -400,7 +411,7 @@
       document.getElementById("healthFill").style.width = `${player.health}%`;
       document.getElementById("devStatus").textContent = developerMode ? " · DEV MODE: FLY / INVINCIBLE" : "";
       document.getElementById("weaponName").textContent = weapons[player.weapon].name;
-      document.getElementById("ammoText").textContent = player.unlocked.includes(player.weapon) ? `∞ · ${player.weapon + 1} / 6 · ${player.points} pts` : `LOCKED · 200 pts · ${player.points} pts`;
+      document.getElementById("ammoText").textContent = player.unlocked.includes(player.weapon) ? `∞ · ${player.weapon + 1} / ${weapons.length} · ${player.points} pts` : `LOCKED · 200 pts · ${player.points} pts`;
       document.getElementById("scoreText").textContent = `Points ${player.points} · KOs ${player.kills}`;
       document.getElementById("roster").textContent = networkMode
         ? `${networkStatus} · ${remotes.size + 1} player${remotes.size === 0 ? "" : "s"}`
@@ -546,35 +557,45 @@
       lastShot = now;
       const origin = camera.position.clone();
       const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
-      drawShot(origin, direction, weapon.color);
-      raycaster.set(origin, direction);
-      raycaster.far = weapon.range;
       const targets = [];
       for (const bot of bots) if (bot.alive) targets.push(...bot.group.children);
       for (const remote of remotes.values()) targets.push(...remote.group.children);
-      const hit = raycaster.intersectObjects(targets, false)[0];
-      if (hit && hit.object.userData.bot) {
-        const bot = hit.object.userData.bot;
-        bot.health -= weapon.damage;
-        if (bot.health <= 0) {
-          bot.alive = false;
-          bot.group.visible = false;
-          player.kills++;
-          player.points += 50;
-          savePlayer();
-          recordBest();
-          updateHud();
-          setTimeout(() => {
-            bot.health = 100;
-            bot.alive = true;
-            bot.group.visible = true;
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+      for (let pellet = 0; pellet < (weapon.pellets || 1); pellet++) {
+        const shotDirection = direction.clone();
+        if (weapon.spread) {
+          shotDirection.addScaledVector(right, (Math.random() - .5) * weapon.spread);
+          shotDirection.addScaledVector(up, (Math.random() - .5) * weapon.spread);
+          shotDirection.normalize();
+        }
+        drawShot(origin, shotDirection, weapon.color);
+        raycaster.set(origin, shotDirection);
+        raycaster.far = weapon.range;
+        const hit = raycaster.intersectObjects(targets, false)[0];
+        if (hit && hit.object.userData.bot) {
+          const bot = hit.object.userData.bot;
+          bot.health -= weapon.damage;
+          if (bot.health <= 0) {
+            bot.alive = false;
+            bot.group.visible = false;
+            player.kills++;
+            player.points += 50;
+            savePlayer();
+            recordBest();
+            updateHud();
+            setTimeout(() => {
+              bot.health = 100;
+              bot.alive = true;
+              bot.group.visible = true;
               const spawn = findBotSpawn();
               bot.group.position.set(spawn.x, 0, spawn.z);
-          }, 3500);
+            }, 3500);
+          }
+          flashHit();
         }
-        flashHit();
+        announce("shot", { x: origin.x, y: origin.y, z: origin.z, dx: shotDirection.x, dy: shotDirection.y, dz: shotDirection.z, color: weapon.color, damage: weapon.damage });
       }
-      announce("shot", { x: origin.x, y: origin.y, z: origin.z, dx: direction.x, dy: direction.y, dz: direction.z, color: weapon.color, damage: weapon.damage });
     }
     function flashHit() {
       const crosshair = document.getElementById("crosshair");
@@ -671,12 +692,12 @@
     function findBotSpawn() {
       for (let attempt = 0; attempt < 100; attempt++) {
         const angle = Math.random() * Math.PI * 2;
-        const distance = 25 + Math.random() * 25;
-        const x = player.pos.x + Math.cos(angle) * distance;
-        const z = player.pos.z + Math.sin(angle) * distance;
+        const distance = 14 + Math.random() * 27;
+        const x = Math.cos(angle) * distance;
+        const z = Math.sin(angle) * distance;
         if (!blocked(x, z, .5)) return { x, z };
       }
-      return { x: player.pos.x + 35, z: player.pos.z };
+      return { x: -17, z: -17 };
     }
     function step(now, dt) {
       if (developerMode) player.health = 100;
@@ -712,7 +733,10 @@
         camera.position.copy(player.pos);
         camera.rotation.set(player.pitch, player.yaw, 0, "YXZ");
         if (firing) fire();
-        if (keys.has("KeyE") && Math.hypot(player.pos.x, player.pos.z) < 2.6 && player.health < 100) {
+        const insideHealingBuilding = healZones.some(zone =>
+          Math.abs(player.pos.x - zone.x) < zone.hx && Math.abs(player.pos.z - zone.z) < zone.hz
+        );
+        if (keys.has("KeyE") && (Math.hypot(player.pos.x, player.pos.z) < 2.6 || insideHealingBuilding) && player.health < 100) {
           player.health = Math.min(100, player.health + 24 * dt);
           updateHud();
         }
@@ -724,8 +748,10 @@
             const speed = distance < 13 ? 1.3 : .65;
             const moveX = dx / distance * speed * dt;
             const moveZ = dz / distance * speed * dt;
-            if (!blocked(bot.group.position.x + moveX, bot.group.position.z, .5)) bot.group.position.x += moveX;
-            if (!blocked(bot.group.position.x, bot.group.position.z + moveZ, .5)) bot.group.position.z += moveZ;
+            const nextX = bot.group.position.x + moveX;
+            const nextZ = bot.group.position.z + moveZ;
+            if (Math.hypot(nextX, bot.group.position.z) <= enemySpawnRadius && !blocked(nextX, bot.group.position.z, .5)) bot.group.position.x = nextX;
+            if (Math.hypot(bot.group.position.x, nextZ) <= enemySpawnRadius && !blocked(bot.group.position.x, nextZ, .5)) bot.group.position.z = nextZ;
             bot.group.rotation.y = Math.atan2(dx, dz);
           } else if (now > bot.nextAttack) {
             bot.nextAttack = now + 1050;
@@ -827,7 +853,7 @@
       if (["Space", "ArrowUp", "ArrowDown"].includes(event.code)) event.preventDefault();
       if (event.code.startsWith("Digit")) {
         const index = Number(event.code.slice(5)) - 1;
-        if (index >= 0 && index < 6) switchWeapon(index);
+        if (index >= 0 && index < weapons.length) switchWeapon(index);
       }
       if (event.code === "Space" && !developerMode && player.onGround && active) {
         player.velocityY = 7.3;
