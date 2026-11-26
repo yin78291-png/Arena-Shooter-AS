@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Neon Outpost</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
   <style>
     :root {
       color-scheme: dark;
@@ -182,6 +183,8 @@
     const healZones = [];
     const worldChunks = new Map();
     const worldChunkSize = 100;
+    const playerSpawn = { x: 0, z: 20 };
+    const enemySpawnClearance = 28;
     let loadedChunkCenterX = null;
     let loadedChunkCenterZ = null;
     function box(x, y, z, sx, sy, sz, color, solid = true, parent = scene) {
@@ -304,7 +307,7 @@
     scene.add(stationRing);
 
     const savedPlayer = JSON.parse(localStorage.getItem("neon-outpost-player-v1") || "{}");
-    const player = { pos: new THREE.Vector3(0, 1.7, 20), velocityY: 0, yaw: Math.PI, pitch: 0, health: 100, weapon: 0, points: Number.isFinite(savedPlayer.points) ? Math.max(0, savedPlayer.points) : 0, kills: 0, unlocked: Array.isArray(savedPlayer.unlocked) ? [...new Set([0, ...savedPlayer.unlocked.filter(i => Number.isInteger(i) && i >= 0 && i < weapons.length)])] : [0], name: typeof savedPlayer.name === "string" ? savedPlayer.name.slice(0, 20) : "", onGround: true };
+    const player = { pos: new THREE.Vector3(playerSpawn.x, 1.7, playerSpawn.z), velocityY: 0, yaw: Math.PI, pitch: 0, health: 100, weapon: 0, points: Number.isFinite(savedPlayer.points) ? Math.max(0, savedPlayer.points) : 0, kills: 0, unlocked: Array.isArray(savedPlayer.unlocked) ? [...new Set([0, ...savedPlayer.unlocked.filter(i => Number.isInteger(i) && i >= 0 && i < weapons.length)])] : [0], name: typeof savedPlayer.name === "string" ? savedPlayer.name.slice(0, 20) : "", onGround: true };
     const leaderboard = JSON.parse(localStorage.getItem("neon-outpost-leaderboard-v1") || "[]");
     const playerId = Math.random().toString(36).slice(2);
     const keys = new Set();
@@ -390,7 +393,7 @@
       head.userData.bot = bot;
       bots.push(bot);
     }
-    [[-17, -17], [16, -14], [-19, 3], [18, 18], [2, -22], [-5, 18]].forEach((p, i) => makeBot(p[0], p[1], i));
+    [[-17, -17], [16, -14], [-25, 3], [30, 18], [2, -22], [-27, 12]].forEach((p, i) => makeBot(p[0], p[1], i));
 
     function showNotice(text) {
       const el = document.getElementById("notice");
@@ -695,7 +698,8 @@
         const distance = 14 + Math.random() * 27;
         const x = Math.cos(angle) * distance;
         const z = Math.sin(angle) * distance;
-        if (!blocked(x, z, .5)) return { x, z };
+        const outsidePlayerSpawn = Math.hypot(x - playerSpawn.x, z - playerSpawn.z) >= enemySpawnClearance;
+        if (outsidePlayerSpawn && !blocked(x, z, .5)) return { x, z };
       }
       return { x: -17, z: -17 };
     }
